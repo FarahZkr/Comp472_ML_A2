@@ -24,16 +24,15 @@ def write_to_file_2(message):
         file.write(message)
 
 
-def find_closest_synonym(questionWord, synonym_words):
+def find_closest_synonym(question_word, synonym_words):
     try:
-        if questionWord in word2vec_model.index_to_key:
-            if any(word in word2vec_model.index_to_key for word in [questionWord] + synonym_words):
-                similarities = [(word, word2vec_model.similarity(questionWord, word)) for word in synonym_words]
+        if question_word in word2vec_model.index_to_key:
+            if any(word in word2vec_model.index_to_key for word in [question_word] + synonym_words):
+                similarities = [(word, word2vec_model.similarity(question_word, word)) for word in synonym_words]
                 closest_synonym = max(similarities, key=lambda x: x[1])[0]
                 return closest_synonym
             else:
-                closest_word = word2vec_model.most_similar(questionWord, topn=1)[0][0].lower()
-                return closest_word
+                return "Synonyms not found."
         else:
             return "Synonyms not found."
     except KeyError:
@@ -49,19 +48,17 @@ for index, row in dataset.iterrows():
     to_write = f"{question},{answer}"
 
     similar_word = find_closest_synonym(question, synonyms)
-    if similar_word != "Synonyms not found." and similar_word in synonyms:
+    if similar_word != "Synonyms not found.":
         to_write += f",{similar_word}"
         if similar_word != answer:
             to_write += ",wrong"
         else:
             to_write += ",correct"
             correct_labels += 1
-    elif similar_word != "Synonyms not found.":
-        to_write += f",{similar_word},guess"
-        dataset_length -= 1
     else:
-        to_write += f",{random.choice(word2vec_model.index_to_key).lower()},guess"
+        to_write += f",{random.choice(synonyms).lower()},guess"
         dataset_length -= 1
+
     to_write += "\n"
     write_to_file_1(to_write)
     to_write = ""
