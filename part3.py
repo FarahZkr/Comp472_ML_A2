@@ -4,11 +4,25 @@ from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
 from gensim.models import Word2Vec
 import pandas as pd
+import random
 
 # Download NLTK resources
 nltk.download('punkt')
 nltk.download('stopwords')
 
+file_path = 'A2-DataSet/synonym.csv'
+dataset = pd.read_csv(file_path)
+dataset_length = len(dataset)
+
+
+def write_to_file_1(name, message):
+    with open(f"{name}-details.csv", 'a') as file:
+        file.write(message)
+
+
+def write_to_file_2(message):
+    with open("analysis.csv", 'a') as file:
+        file.write(message)
 
 # Function for preprocessing text
 def preprocess_text(text):
@@ -23,50 +37,82 @@ def preprocess_text(text):
 
     return preprocessed_sentences
 
-
-# Function to train Word2Vec model and save details to CSV
-def train_word2vec_model(sentences, window_size, embedding_size, model_name):
-    model = Word2Vec(sentences, window=window_size, vector_size=embedding_size, sg=0)  # sg=0 for CBOW, sg=1 for Skip-gram
-
-    # Save model details to CSV
-    details_df = pd.DataFrame({
-        'Model Name': [model_name],
-        'Window Size': [window_size],
-        'Embedding Size': [embedding_size],
-        'Vocabulary Size': [len(model.wv)],
-        'Most Similar Words': [model.wv.most_similar('example_word', topn=5)],
-        # Replace 'example_word' with a word from your data
-    })
-
-    details_df.to_csv(f'{model_name}-details.csv', index=False, mode='w')
-
-    # Save model to file if needed
-    # model.save(f'{model_name}.model')
-
-    return details_df
-
+def find_closest_synonym(model, question_word, synonym_words):
+    try:
+        if question_word in model.wv.index_to_key:
+            if any(word in model.wv.index_to_key for word in [question_word] + synonym_words):
+                similarities = [(word, model.wv.similarity(question_word, word)) for word in synonym_words]
+                closest_synonym = max(similarities, key=lambda x: x[1])[0]
+                return closest_synonym
+            else:
+                return "Synonyms not found."
+        else:
+            return "Synonyms not found."
+    except KeyError:
+        return "Synonyms not found."
 
 # Main script
-book_files = ["hamlet.txt", "macbeth.txt", "othello.txt", "romeoJuliet.txt", "tempest.txt"]
+book_files = ["hamlet.txt", "macbeth.txt", "othello.txt", "romeoJuliet.txt", "tempest.txt", "captain.txt", "willowWeaver.txt"]
 
 analysis_df = pd.DataFrame()
 
+book_text = ""
 for book_file in book_files:
     with open(book_file, 'r', encoding='utf-8') as file:
-        book_text = file.read()
+        book_text += file.read()
 
-    # Preprocess text
-    preprocessed_sentences = preprocess_text(book_text)
+# Preprocess text
+preprocessed_sentences = preprocess_text(book_text)
 
-    # Train Word2Vec models with different parameters
-    window_sizes = [3, 5]
-    embedding_sizes = [100, 200]
+# Train Word2Vec models with different parameters
+window_sizes = [3, 5]
+embedding_sizes = [100, 200]
 
-    for window_size in window_sizes:
-        for embedding_size in embedding_sizes:
-            model_name = f'model_W{window_size}_E{embedding_size}'
-            details_df = train_word2vec_model(preprocessed_sentences, window_size, embedding_size, model_name)
-            analysis_df = analysis_df.append(details_df, ignore_index=True)
+models = []
+model_names =[]
 
+for window_size in window_sizes:
+    for embedding_size in embedding_sizes:
+        model_name = f'model_W{window_size}_E{embedding_size}'
+        model_names.append(model_name)
+        model = Word2Vec(preprocessed_sentences, window=window_size, vector_size=embedding_size)
+        model.train(preprocessed_sentences, total_examples=len(preprocessed_sentences), epochs=10)
+        models.append(model)
+
+for i, model in enumerate(models):
+    correct_labels = 0
+    model_name = model_names[i]
+    tmp = dataset_length
+    vocab_size = len(model.wv.key_to_index)
+    print(model_name + ": " + str(vocab_size))
+    print(f"Model {i}: {model_name}")
+    for index, row in dataset.iterrows():
+        question = row['question']
+        answer = row['answer']
+        synonyms = [row[f'{i}'] for i in range(0, 4)]
+
+        to_write = f"{question},{answer}"
+
+        similar_word = find_closest_synonym(model, question, synonyms)
+        if similar_word != "Synonyms not found.":
+            to_write += f",{similar_word}"
+            if similar_word != answer:
+                to_write += ",wrong"
+            else:
+                to_write += ",correct"
+                correct_labels += 1
+        else:
+            to_write += f",{random.choice(synonyms).lower()},guess"
+            tmp -= 1
+
+        to_write += "\n"
+        write_to_file_1(model_name, to_write)
+        to_write = ""
+    if tmp == 0:
+        total = 0
+    else:
+        total = correct_labels / tmp
+    analysis_file = f"{model_name},{vocab_size},{correct_labels},{tmp},{total}\n"
+    write_to_file_2(analysis_file)
 # Save analysis details to CSV
-analysis_df.to_csv('analysis.csv', index=False, mode='a')
+analysis_df.to_csv('analysis.csv', index=False, header=False, mode='a')
