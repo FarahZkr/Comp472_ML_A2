@@ -38,43 +38,21 @@ def preprocess_text(text):
     return preprocessed_sentences
 
 def find_closest_synonym(model, question_word, synonym_words):
-    # try:
-
-
-        # if question_word in model.wv.index_to_key:
-            # Check if any of the potential synonym words are in the model's vocabulary
-            # if any(word in model.wv.index_to_key
-            #        for word in [question_word] + synonym_words):
-            #     similarities = [(word, model.wv.similarity(question_word, word)) for word in synonym_words]
-            #     # syn with largest similarity
-            #     closest_synonym = max(similarities, key=lambda x: x[1])[0]
-            #     # if question word in model
-            #     return closest_synonym
-
         if question_word in model.wv:
             similarity= []
-            print (question_word, synonym_words)
             for choice in synonym_words:
-                # print (choice)
                 if choice in model.wv:
-                    print ("**")
                     similarity.append(model.wv.similarity(question_word,choice))
                 else:
                     return  "Synonym not found"
                 index_closest_synonym = similarity.index(max(similarity))
             closest_synonym = synonym_words[index_closest_synonym]
-            print (closest_synonym)
         else:
-            print ("??")
             return "Synonyms not found."
         return closest_synonym
-    #     else:
-    #         return "Synonyms not found."
-    # except KeyError:
-    #     return "Synonyms not found."
 
 # Main script
-book_files = ["hamlet.txt", "macbeth.txt", "othello.txt", "romeoJuliet.txt", "tempest.txt", "captain.txt", "willowWeaver.txt"]
+book_files = ["hamlet.txt", "macbeth.txt", "othello.txt", "romeoJuliet.txt", "tempest.txt", "captain.txt", "willowWeaver.txt", "EdgarAllanPoe.txt", "EdgarAllanPoeVol4.txt", "ladyShroud.txt", "NightLand.txt"]
 
 # dataframe
 analysis_df = pd.DataFrame()
@@ -100,7 +78,6 @@ for window_size in window_sizes:
         model_names.append(model_name)
         model = Word2Vec(preprocessed_sentences, window=window_size, vector_size=embedding_size)
         model.train(preprocessed_sentences, total_examples=len(preprocessed_sentences), epochs=10)
-        # print(model.wv['hardly'])
         models.append(model)
 
 
@@ -109,8 +86,6 @@ for i, model in enumerate(models):
     model_name = model_names[i]
     tmp = dataset_length
     vocab_size = len(model.wv.key_to_index)
-    print(model_name + ": " + str(vocab_size))
-    print(f"Model {i}: {model_name}")
     for index, row in dataset.iterrows():
         question = row['question']
         answer = row['answer']
